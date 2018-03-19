@@ -1,0 +1,142 @@
+#!/bin/bash
+#
+# HOSTALIASES manager
+#
+# Author: Paul Armstrong
+
+set -u
+
+readonly ALIASES_DIR=~/.hostaliases.d
+readonly ALIASES_LINK=~/.hostaliases
+
+die() {
+  echo $@ >&2
+  exit 1
+}
+
+err() {
+  echo $@ >&2
+}
+
+usage() {
+  cat <<EOF
+USAGE: halias add|create|current||list|remove|use args
+
+ARGS:
+* add: alias hostname
+* create: file
+* remove: alias
+* show: file (optional)
+* use: file
+
+COMMANDS:
+add: Add an alias to the curren file
+create: Creates a new file and switches to it
+current: Show the currently active file
+list: List the available files
+remove: Remove an alias from the curren file
+show: Show the contents of the given file (or the current one if no args given)
+use: Switch to the specified file
+
+Files are kept in ${ALIASES_DIR}
+
+To use the aliases, you need to put the following line in your 
+.profile or .bash_profile (and run it for current terminals):
+export HOSTALIASES=${ALIASES_LINK}
+
+EOF
+  exit 1
+}
+
+if [[ $# -lt 1 ]]; then
+  usage
+fi
+
+if [[ ! $1 =~ add|create|current|list|remove|show|use ]]; then
+  err "$1 is not a recognized argument"
+  err ""
+  usage
+fi
+
+if [[ ! -d "${ALIASES_DIR}" ]]; then
+  mkdir  "${ALIASES_DIR}" || die "Unable to create ${ALIASES_DIR}"
+fi
+
+case $1 in
+  'add')
+    if [[ $# -ne 3 ]]; then
+      die "add requires an aliase and a hostname"
+    fi
+    check=$(awk '{print $1}' "${ALIASES_LINK}" | grep -w $2)
+    if [[ ! -z "${check}" ]]; then
+      die "$2 already exists"
+    fi
+    echo "$2 $3" >> "${ALIASES_LINK}"
+  ;;
+  'current')
+    if [[ ! -f "${ALIASES_LINK}" ]]; then
+      die "${ALIASES_LINK} does not exist. HOSTALIASES is not configured."
+    fi
+    ls -al "${ALIASES_LINK}" | awk '{print $NF}' | awk -F/ '{print $NF}'
+  ;;
+  'create')
+    if [[ $# -ne 2 ]]; then
+      die "create requires a file name"
+    fi
+    aliases_file="${ALIASES_DIR}/$2"
+    if [[ -f "${aliases_file}" ]]; then
+      die "${aliases_file} already exists"
+    fi
+    touch "${aliases_file}"
+    ln -sf "${aliases_file}" "${ALIASES_LINK}" \
+      || die "Unable to link ${ALIASES_LINK} to ${aliases_dir}"
+  ;;
+  'list')
+    ls "${ALIASES_DIR}"
+  ;;
+  'remove')
+    if [[ $# -ne 2 ]]; then
+      die "remove requires an aliase"
+    fi
+    tempfile=$(mktemp /tmp/${0}.XXXXXXXX)
+    if [[ ! -f "${tempfile}" ]]; then
+      die "Unable to create temp file"
+    fi
+    grep -vE "^${2}[[:space:]]" "${ALIASES_LINK}" > "${tempfile}"
+    if [[ ! -s "${tempfile}" ]]; then
+      err "You have removed the last entry. Continue Y|N?"
+      while read line; do
+        case "${line}" in
+          Y|y)
+            break
+          ;;
+          N|n)
+            exit
+          ;;
+        esac
+      done
+    fi
+    mv "${tempfile}" "${ALIASES_LINK}"
+  ;;
+  'show')
+    if [[ $# -eq 2 ]]; then
+      file="${ALIASES_DIR}/$2"
+    else
+      file="${ALIASES_LINK}"
+    fi
+    if [[ ! -f "${file}" ]]; then
+      die "${file} does not exist"
+    fi
+    cat "${file}"
+  ;;
+  'use')
+    if [[ $# -ne 2 ]]; then
+      die "use requires a file"
+    fi
+    if [[ ! -f "${ALIASES_DIR}/$2" ]]; then
+      die "$2 does not exist"
+    fi
+    ln -sf "${ALIASES_DIR}/$2" "${ALIASES_LINK}" \
+      || die "Unable to link ${ALIASES_LINK} to ${aliases_dir}"
+  ;;
+esac
