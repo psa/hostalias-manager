@@ -30,11 +30,11 @@ ARGS:
 * use: file
 
 COMMANDS:
-add: Add an alias to the curren file
+add: Add an alias to the current file
 create: Creates a new file and switches to it
 current: Show the currently active file
 list: List the available files
-remove: Remove an alias from the curren file
+remove: Remove an alias from the current file
 show: Show the contents of the given file (or the current one if no args given)
 use: Switch to the specified file
 
